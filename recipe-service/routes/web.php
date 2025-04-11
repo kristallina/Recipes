@@ -1,18 +1,12 @@
 <?php
 
-/** @var \Laravel\Lumen\Routing\Router $router */
+use Illuminate\Support\Facades\Router;
+use App\Http\Controllers\RecipeController;
 
-/*
-|--------------------------------------------------------------------------
-| Application Routes
-|--------------------------------------------------------------------------
-|
-| Here is where you can register all of the routes for an application.
-| It is a breeze. Simply tell Lumen the URIs it should respond to
-| and give it the Closure to call when that URI is requested.
-|
-*/
-
-$router->get('/', function () use ($router) {
-    return $router->app->version();
+$router->group(['prefix' => 'api'], function () use ($router) {
+    $router->get('recipes', 'RecipeController@index');
+    $router->post('recipes', 'RecipeController@store');
+    $router->get('recipes/{id}', 'RecipeController@show');
+    $router->put('recipes/{id}', 'RecipeController@update');
+    $router->delete('recipes/{id}', 'RecipeController@destroy');
 });
