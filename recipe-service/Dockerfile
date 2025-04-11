@@ -1,49 +1,40 @@
-FROM php:8.2-apache-bookworm
+FROM php:8.2-fpm
 
 # 1. Установка системных зависимостей
 RUN apt-get update && apt-get install -y \
-    libpq-dev \
-    postgresql-client \
     git \
-    unzip \
+    curl \
     zip \
+    unzip \
     libzip-dev \
-    && rm -rf /var/lib/apt/lists/*
+    && docker-php-ext-install zip pdo_mysql
 
-# 2. Установка расширений PHP
-RUN docker-php-ext-configure zip && \
-    docker-php-ext-install -j$(nproc) \
-    pdo \
-    pdo_pgsql \
-    pgsql \
-    zip
+# 2. Установка Composer
+RUN curl -sS https://getcomposer.org/installer | php -- \
+    --install-dir=/usr/local/bin \
+    --filename=composer \
+    && chmod +x /usr/local/bin/composer
 
-# 3. Настройка Apache
-RUN a2enmod rewrite
-COPY .docker/apache.conf /etc/apache2/sites-available/000-default.conf
+# 3. Рабочая директория
+WORKDIR /var/www
 
-# 4. Установка Composer
-RUN curl -sS https://getcomposer.org/installer | php -- --install-dir=/usr/local/bin --filename=composer
+# 4. Копируем только composer файлы сначала
+COPY composer.json composer.lock ./
 
-# 5. Рабочая директория
-WORKDIR /var/www/html
+# 5. Установка зависимостей
+RUN composer install --no-interaction --optimize-autoloader --no-scripts
 
-# 6. Копирование файлов проекта
+# 6. Копируем остальные файлы проекта
 COPY . .
 
-# 7. Установка зависимостей Composer (с обработкой ошибок)
-RUN if [ -f "composer.lock" ]; then \
-    composer install --no-dev --no-scripts --no-interaction || \
-    { rm -f composer.lock && composer install --no-dev --no-scripts --no-interaction; }; \
-    else \
-    composer install --no-dev --no-scripts --no-interaction; \
-    fi && \
-    composer dump-autoload --optimize
+# 7. Создаем недостающие директории
+RUN mkdir -p storage/framework/{sessions,views,cache} \
+    && mkdir -p bootstrap/cache
 
-RUN mkdir -p /var/www/html/storage/logs && \
-    chown -R www-data:www-data /var/www/html/storage && \
-    chmod -R 775 /var/www/html/storage && \
-    composer require guzzlehttp/guzzle
+# 8. Настройка прав
+RUN chown -R www-data:www-data storage bootstrap/cache \
+    && chmod -R 775 storage bootstrap/cache
 
-EXPOSE 80
-CMD ["apache2-foreground"]
+# 9. Порт и команда
+EXPOSE 9000
+CMD ["php", "-S", "0.0.0.0:80", "-t", "public"]

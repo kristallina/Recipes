@@ -8,12 +8,7 @@ class Recipe extends Model
 {
     protected $fillable = [
         'title', 
-        'description',
-        'ingredients',
-        'instructions'
-    ];
-    
-    protected $casts = [
-        'ingredients' => 'array'
+        'description', 
+        'cooking_time'
     ];
 }
