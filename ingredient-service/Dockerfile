@@ -1,40 +1,45 @@
-FROM php:8.2-fpm
+FROM php:8.2-apache-bookworm
 
 # 1. Установка системных зависимостей
 RUN apt-get update && apt-get install -y \
+    libpq-dev \
+    postgresql-client \
     git \
-    curl \
-    zip \
     unzip \
+    zip \
     libzip-dev \
-    && docker-php-ext-install zip pdo_mysql
+    && rm -rf /var/lib/apt/lists/*
 
-# 2. Установка Composer
-RUN curl -sS https://getcomposer.org/installer | php -- \
-    --install-dir=/usr/local/bin \
-    --filename=composer \
-    && chmod +x /usr/local/bin/composer
+# 2. Установка расширений PHP
+RUN docker-php-ext-configure zip && \
+    docker-php-ext-install -j$(nproc) \
+    pdo \
+    pdo_pgsql \
+    pgsql \
+    zip
 
-# 3. Рабочая директория
-WORKDIR /var/www
+# 3. Настройка Apache
+RUN a2enmod rewrite
+COPY .docker/apache.conf /etc/apache2/sites-available/000-default.conf
 
-# 4. Копируем только composer файлы сначала
-COPY composer.json composer.lock ./
+# 4. Установка Composer
+RUN curl -sS https://getcomposer.org/installer | php -- --install-dir=/usr/local/bin --filename=composer
 
-# 5. Установка зависимостей
-RUN composer install --no-interaction --optimize-autoloader --no-scripts
+# 5. Рабочая директория
+WORKDIR /var/www/html
 
-# 6. Копируем остальные файлы проекта
+# 6. Копирование файлов проекта
 COPY . .
 
-# 7. Создаем недостающие директории
-RUN mkdir -p storage/framework/{sessions,views,cache} \
-    && mkdir -p bootstrap/cache
+# 7. Установка зависимостей Composer (с обработкой ошибок)
+RUN if [ -f "composer.lock" ]; then \
+        composer install --no-dev --no-scripts --no-interaction || \
+        { rm -f composer.lock && composer install --no-dev --no-scripts --no-interaction; }; \
+    else \
+        composer install --no-dev --no-scripts --no-interaction; \
+    fi && \
+    composer dump-autoload --optimize
 
-# 8. Настройка прав
-RUN chown -R www-data:www-data storage bootstrap/cache \
-    && chmod -R 775 storage bootstrap/cache
 
-# 9. Порт и команда
-EXPOSE 9000
-CMD ["php", "-S", "0.0.0.0:80", "-t", "public"]
+EXPOSE 80
+CMD ["apache2-foreground"]

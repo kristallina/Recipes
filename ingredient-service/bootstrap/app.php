@@ -1,5 +1,12 @@
 <?php
 
+putenv('DB_CONNECTION=pgsql');
+putenv('DB_HOST=ingredient-db');
+putenv('DB_PORT=5432');
+putenv('DB_DATABASE=ingredient_db');
+putenv('DB_USERNAME=postgres');
+putenv('DB_PASSWORD=secret');
+
 require_once __DIR__.'/../vendor/autoload.php';
 
 (new Laravel\Lumen\Bootstrap\LoadEnvironmentVariables(
@@ -23,7 +30,8 @@ $app = new Laravel\Lumen\Application(
     dirname(__DIR__)
 );
 
-$app->withFacades(); //
+$app->withFacades(); 
+$app->configure('database');
 
 $app->withEloquent(); //
 
@@ -111,6 +119,8 @@ $app->router->group([
 ], function ($router) {
     require __DIR__.'/../routes/web.php';
 });
+
+$app->configure('database');
 
 $app->register(Laravel\Tinker\TinkerServiceProvider::class);
 return $app;
